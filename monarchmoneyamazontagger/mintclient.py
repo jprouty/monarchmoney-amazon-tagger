@@ -4,7 +4,7 @@ from pprint import pprint
 import requests
 import time
 
-from mintamazontagger.currency import micro_usd_to_float_usd
+from monarchmoneyamazontagger.currency import micro_usd_to_float_usd
 
 from mintapi.api import Mint
 

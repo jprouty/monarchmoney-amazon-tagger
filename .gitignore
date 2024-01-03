@@ -4,7 +4,8 @@ dist/
 release_venv/
 dev_venv/
 pypi_test_venv/
-MintAmazonTagger.spec
+MonarchMoneyAmazonTagger.spec
+debug-data/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

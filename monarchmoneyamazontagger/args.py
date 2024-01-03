@@ -15,62 +15,13 @@ def define_common_args(parser):
         '--amazon_export', nargs='+', type=argparse.FileType('r', encoding='utf-8'),
         help=('One or more Amazon Data Exports zip file (type either "Orders" or "All Data").'))
 
-    # Mint creds:
+    # Monarch Money creds:
     parser.add_argument(
-        '--mint_email', default=None,
-        help=('Mint e-mail address for login.'))
+        '--mm_email', default=None,
+        help=('Monarch Money e-mail address for login.'))
     parser.add_argument(
-        '--mint_password', default=None,
-        help=('Mint password for login.'))
-    parser.add_argument(
-        '--mint_mfa_preferred_method',
-        default='sms',
-        choices=['sms', 'email', 'soft-token'],
-        help='The preferred Mint MFA method (2factor auth codes).')
-    parser.add_argument(
-        '--mint_mfa_soft_token',
-        default=None,
-        help='The MFA soft-token to pass to oathtool.')
-    parser.add_argument(
-        '--mint_login_timeout',
-        default=60 * 5,
-        help='The number of seconds to wait attempting to log into Mint.')
-    parser.add_argument(
-        '--mint_sync_timeout',
-        default=60 * 5,
-        help='The number of seconds to wait attempting to sync a Mint account.')
-    parser.add_argument(
-        '--mint_wait_for_sync',
-        action='store_true',
-        default=False,
-        help=('Wait for Mint accounts to sync, up to 5 minutes. By '
-              'default, do not wait for accounts to sync with the backing '
-              'financial institutions.'))
-    parser.add_argument(
-        '--mint_user_will_login',
-        action='store_true',
-        default=False,
-        help='If set, let the user log in on their own.')
-    parser.add_argument(
-        '--mint_intuit_account',
-        default=None,
-        help=('The intuit account to select if multiple are associated with '
-              '--mint_email. If not provided, attempt to use the intuit account '
-              'username that matches --mint_email.'))
-
-    # Mint API options:
-    default_session_path = os.path.join(TAGGER_BASE_PATH, 'ChromeSession')
-    parser.add_argument(
-        '--session_path', nargs='?',
-        default=default_session_path,
-        help=('Directory to save browser session, including cookies. Use to '
-              'prevent repeated MFA prompts. Defaults to a directory in your '
-              'home dir. Set to None to use a temporary profile.'))
-    parser.add_argument(
-        '--headless',
-        action='store_true',
-        default=False,
-        help='Whether to execute chromedriver with no visible window.')
+        '--mm_password', default=None,
+        help=('Monarch Money password for login.'))
 
     # Prefix customization:
     parser.add_argument(
@@ -106,17 +57,17 @@ def define_common_args(parser):
         '--verbose_itemize', action='store_true',
         help=('Itemize everything, instead of the default behavior, which is '
               'to not itemize out shipping/promos/etc if '
-              'there is only one item per Mint transaction. Will also remove '
+              'there is only one item per Monarch Money transaction. Will also remove '
               'free shipping.'))
     parser.add_argument(
         '--no_itemize', action='store_true',
-        help=('Do not split Mint transactions into individual items with '
+        help=('Do not split Monarch Money transactions into individual items with '
               'attempted categorization.'))
 
     parser.add_argument(
         '--num_updates', type=int,
         default=0,
-        help=('Only send the first N updates to Mint (or print N updates at '
+        help=('Only send the first N updates to Monarch Money (or print N updates at '
               'dry run). If not present, all updates are sent or printed.'))
     parser.add_argument(
         '--retag_changed', action='store_true',
@@ -136,7 +87,7 @@ def define_common_args(parser):
     # Tagging options:
     parser.add_argument(
         '--no_tag_categories', action='store_true',
-        help=('Do not update Mint categories. This is useful as '
+        help=('Do not update Monarch Money categories. This is useful as '
               'Amazon doesn\'t provide the best categorization and it is '
               'pretty common user behavior to manually change the categories. '
               'This flag prevents tagger from wiping out that user work.'))
@@ -150,63 +101,54 @@ def define_common_args(parser):
         default=5,
         help=('How many days are allowed to pass between when Amazon has '
               'shipped an order and when the payment has posted to your '
-              'bank account (as per Mint\'s view).'))
+              'bank account (as per Monarch Money\'s view).'))
     parser.add_argument(
-        '--mint_input_description_filter', type=str,
+        '--mm_input_description_filter', type=str,
         default='amazon,amzn',
-        help=('Only consider Mint transactions that have one of these strings '
+        help=('Only consider Monarch Money transactions that have one of these strings '
               'in the description field. Case-insensitive comma-separated.'))
     parser.add_argument(
-        '--mint_input_include_user_description', action='store_true',
-        help=('Consider using the current description from Mint when '
+        '--mm_input_include_user_description', action='store_true',
+        help=('Consider using the current description from Monarch Money when '
               'determining if a transaction is an Amazon purchase. This will '
-              'include any user edits or previous runs of MintAmazonTagger. '
-              'This is similar to --mint_input_include_inferred_description.'))
+              'include any user edits or previous runs of MonarchMoneyAmazonTagger. '
+              'This is similar to --mm_input_include_inferred_description.'))
     # TODO(jprouty): Revisit if this is still accurate in the FIData message.
     parser.add_argument(
-        '--mint_input_include_inferred_description', action='store_true',
-        help=('Consider using the inferred description from Mint\'s '
+        '--mm_input_include_inferred_description', action='store_true',
+        help=('Consider using the inferred description from Monarch Money\'s '
               '"FinancialInstitutionData" when determining if '
               'a transaction is an Amazon purchase. This may be necessary '
               'when a bank renames transactions to "Debit card payment". '
-              'Mint sometimes auto-recovers these into "Amazon", and flipping '
+              'Monarch Money sometimes auto-recovers these into "Amazon", and flipping '
               'this flag will help match these. To know if you should use it, '
-              'find a transaction in the Mint tool, and click on the details. '
+              'find a transaction in the Monarch Money tool, and click on the details. '
               'Look for "Appears on your BANK ACCOUNT NAME statement as NOT '
               'USEFUL NAME on DATE".'))
     parser.add_argument(
-        '--mint_input_categories_filter', type=str,
-        help=('Only consider Mint transactions that match one of '
+        '--mm_input_categories_filter', type=str,
+        help=('Only consider Monarch Money transactions that match one of '
               'the given categories here. Comma separated list of Mint '
               'categories.'))
 
     parser.add_argument(
-        '--save_pickle_backup', action='store_true',
+        '--save_json_backup', action='store_true',
         default=False,
-        help=('Saves a backup of your Mint transactions to a python "Pickle" '
-              'file, just in case anything goes wrong or for rapid '
-              'development so you don\'t have to download from Mint every '
+        help=('Saves a backup of your Monarch Money transactions to a json file, '
+              'just in case anything goes wrong or for rapid '
+              'development so you don\'t have to download from Monarch Money every '
               'time the tool is run. Off by default to prevent storing '
               'sensitive information locally without a user knowing it.'))
     parser.add_argument(
-        '--pickled_epoch', type=int,
-        help=('Do not fetch categories or transactions from Mint. Use this '
-              'pickled epoch instead. If coupled with --dry_run, no '
-              'connection to Mint is established.'))
-    default_pickle_path = os.path.join(TAGGER_BASE_PATH, 'Mint Backup')
+        '--use_json_backup', type=int,
+        help=('Do not fetch categories or transactions from Monarch Money. Use json '
+              'backups from the given epoch instead. If coupled with --dry_run, no '
+              'connection to Monarch Money is established.'))
+    default_json_path = os.path.join(TAGGER_BASE_PATH, 'Monarch Money Backup')
     parser.add_argument(
-        '--mint_pickle_location', type=str,
-        default=default_pickle_path,
-        help='Where to store the fetched Mint pickles (for backup).')
-    parser.add_argument(
-        '--mint_save_json', action='store_true',
-        default=False,
-        help=('Save to disk the raw json responses from Mint. This is useful '
-              'for development and debugging issues with Mint.'))
-    parser.add_argument(
-        '--mint_json_location', type=str,
-        default=default_pickle_path,
-        help='Where to store the fetched Mint json responses.')
+        '--mm_json_backup_path', type=str,
+        default=default_json_path,
+        help='Where to store the Monarch Money backup json files.')
 
 
 def define_gui_args(parser):

@@ -6,12 +6,12 @@
 # exit when any command fails
 set -e
 
-readonly app_name="MintAmazonTagger"
-readonly bundle_ident="com.jeffprouty.mintamazontagger"
+readonly app_name="MonarchMoneyAmazonTagger"
+readonly bundle_ident="com.jeffprouty.monarchmoneyamazontagger"
 readonly app_identity="Developer ID Application: Jeff Prouty (NRC455QXS5)"
 readonly email="jeff.prouty@gmail.com"
 
-readonly app_dir="dist/MintAmazonTagger.app"
+readonly app_dir="dist/MonarchMoneyAmazonTagger.app"
 readonly dmg_path="dist/${app_name}.dmg"
 readonly entitlements="release/entitlements.plist"
 readonly icon_icns="build/Icon.icns"
@@ -43,7 +43,7 @@ pyinstaller \
   --name="${app_name}" \
   --icon="${icon_icns}" \
   --osx-bundle-identifier="${bundle_ident}" \
-   mintamazontagger/main.py
+   monarchmoneyamazontagger/main.py
 
 deactivate
 rm -rf release_venv
@@ -53,7 +53,6 @@ codesign --verify --verbose --force --deep --sign \
   "${app_identity}" \
   --entitlements "${entitlements}" \
   --options=runtime \
-  "${app_dir}/Contents/Resources/selenium/webdriver/common/macos/selenium-manager" \
   "${app_dir}"
 
 echo "Creating installer/disk image"

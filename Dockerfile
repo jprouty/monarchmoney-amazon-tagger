@@ -22,4 +22,4 @@ WORKDIR /var/app
 
 RUN pip3 install -r /var/app/requirements/base.txt -r /var/app/requirements/ubuntu.txt
 
-CMD ["python3", "-m", "mintamazontagger.cli", "--headless"]
+CMD ["python3", "-m", "monarchmoneyamazontagger.cli", "--headless"]

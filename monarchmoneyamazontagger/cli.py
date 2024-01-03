@@ -16,16 +16,16 @@ import time
 
 from outdated import check_outdated
 
-from mintamazontagger import amazon
-from mintamazontagger import mint
-from mintamazontagger import tagger
-from mintamazontagger import VERSION
-from mintamazontagger.args import define_cli_args, TAGGER_BASE_PATH
-from mintamazontagger.my_progress import (
+from monarchmoneyamazontagger import amazon
+from monarchmoneyamazontagger import mint
+from monarchmoneyamazontagger import tagger
+from monarchmoneyamazontagger import VERSION
+from monarchmoneyamazontagger.args import define_cli_args, TAGGER_BASE_PATH
+from monarchmoneyamazontagger.my_progress import (
     counter_progress_cli, determinate_progress_cli, indeterminate_progress_cli)
-from mintamazontagger.currency import micro_usd_to_usd_string
-from mintamazontagger.mintclient import MintClient
-from mintamazontagger.webdriver import get_webdriver
+from monarchmoneyamazontagger.currency import micro_usd_to_usd_string
+from monarchmoneyamazontagger.mintclient import MintClient
+from monarchmoneyamazontagger.webdriver import get_webdriver
 
 logger = logging.getLogger(__name__)
 

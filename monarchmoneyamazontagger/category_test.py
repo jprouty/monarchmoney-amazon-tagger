@@ -1,6 +1,6 @@
 import unittest
 
-from mintamazontagger.category import get_mint_category_from_unspsc
+from monarchmoneyamazontagger.category import get_mint_category_from_unspsc
 
 
 class CurrencyMethods(unittest.TestCase):

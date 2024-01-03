@@ -14,13 +14,13 @@ import readchar
 import time
 import zipfile
 
-from mintamazontagger import amazon
-from mintamazontagger import category
-from mintamazontagger import mint
-from mintamazontagger.my_progress import no_progress_factory
-from mintamazontagger.currency import micro_usd_nearly_equal
+from monarchmoneyamazontagger import amazon
+from monarchmoneyamazontagger import category
+from monarchmoneyamazontagger import mint
+from monarchmoneyamazontagger.my_progress import no_progress_factory
+from monarchmoneyamazontagger.currency import micro_usd_nearly_equal
 
-from mintamazontagger.mint import (
+from monarchmoneyamazontagger.mint import (
     get_trans_and_categories_from_pickle, dump_trans_and_categories)
 
 logger = logging.getLogger(__name__)

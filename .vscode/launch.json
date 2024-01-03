@@ -5,17 +5,17 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "MAT GUI",
+            "name": "MMAT GUI",
             "type": "python",
             "request": "launch",
-            "module": "mintamazontagger.main",
+            "module": "monarchmoneyamazontagger.main",
             "justMyCode": true
         },
         {
-            "name": "MAT CLI",
+            "name": "MMAT CLI",
             "type": "python",
             "request": "launch",
-            "module": "mintamazontagger.cli",
+            "module": "monarchmoneyamazontagger.cli",
             "justMyCode": true
         }
     ]

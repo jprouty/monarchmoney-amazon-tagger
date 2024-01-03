@@ -1,8 +1,8 @@
 from collections import Counter
 import unittest
 
-from mintamazontagger import tagger
-from mintamazontagger.mockdata import MINT_CATEGORIES
+from monarchmoneyamazontagger import tagger
+from monarchmoneyamazontagger.mockdata import MINT_CATEGORIES
 
 
 class Args:

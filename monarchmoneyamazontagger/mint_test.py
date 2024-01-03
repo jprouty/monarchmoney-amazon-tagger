@@ -1,10 +1,10 @@
 from datetime import date
 import unittest
 
-from mintamazontagger import category
-from mintamazontagger import mint
-from mintamazontagger.mint import Transaction
-from mintamazontagger.mockdata import transaction, MINT_CATEGORIES
+from monarchmoneyamazontagger import category
+from monarchmoneyamazontagger import mint
+from monarchmoneyamazontagger.mint import Transaction
+from monarchmoneyamazontagger.mockdata import transaction, MINT_CATEGORIES
 
 
 class HelpMethods(unittest.TestCase):

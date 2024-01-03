@@ -6,11 +6,11 @@ import pickle
 import re
 import os
 
-from mintamazontagger import category
-from mintamazontagger.currency import (
+from monarchmoneyamazontagger import category
+from monarchmoneyamazontagger.currency import (
     micro_usd_to_usd_string, parse_float_usd_as_micro_usd,
     round_micro_usd_to_cent)
-from mintamazontagger.my_progress import NoProgress
+from monarchmoneyamazontagger.my_progress import NoProgress
 
 logger = logging.getLogger(__name__)
 

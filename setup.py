@@ -1,6 +1,6 @@
 import setuptools
 from outdated import check_outdated
-from mintamazontagger import VERSION
+from monarchmoneyamazontagger import VERSION
 from distutils.errors import DistutilsError
 
 
@@ -27,7 +27,7 @@ class CleanCommand(setuptools.Command):
             'target',
             'release_venv',
             'cache',
-            'mint_amazon_tagger.egg-info',
+            'monarchmoney_amazon_tagger.egg-info',
         ]
         for tree in dirs:
             shutil.rmtree(tree, ignore_errors=True)
@@ -54,7 +54,7 @@ class BlockReleaseCommand(setuptools.Command):
 
     def run(self):
         try:
-            stale, latest = check_outdated('mint-amazon-tagger', VERSION)
+            stale, latest = check_outdated('monarchmoney-amazon-tagger', VERSION)
             raise DistutilsError(
                 'Please update VERSION in __init__. '
                 f'Current {VERSION} PyPI latest {latest}')
@@ -63,16 +63,16 @@ class BlockReleaseCommand(setuptools.Command):
 
 
 setuptools.setup(
-    name="mint-amazon-tagger",
+    name="monarchmoney-amazon-tagger",
     version=VERSION,
     author="Jeff Prouty",
     author_email="jeff.prouty@gmail.com",
     description=("Fetches your Amazon order history and matching/tags your "
-                 "Mint transactions"),
-    keywords='amazon mint tagger transactions order history',
+                 "Monarch Money transactions"),
+    keywords='amazon monarch money tagger transactions order history',
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/jprouty/mint-amazon-tagger",
+    url="https://github.com/jprouty/monarchmoney-amazon-tagger",
     packages=setuptools.find_packages(),
     python_requires='>=3',
     classifiers=[
@@ -83,23 +83,16 @@ setuptools.setup(
     ],
     install_requires=[
         'PyQt6',
-        'mintapi>=2.12',
         'mock',
-        'oathtool',
         'outdated',
-        'psutil',
         'progress',
         'range-key-dict',
-        'requests',
-        'readchar',
-        'selenium',
-        'selenium-requests>=2.0.3',
     ],
     entry_points=dict(
         console_scripts=[
-            'mint-amazon-tagger-cli=mintamazontagger.cli:main',
-            'mint-amazon-tagger=mintamazontagger.main:main',
-            'mint-amazon-tagger-repro_selenium_issue=mintamazontagger.repro_mac_issue:main'
+            'monarchmoney-amazon-tagger-cli=monarchmoneyamazontagger.cli:main',
+            'monarchmoney-amazon-tagger=monarchmoneyamazontagger.main:main',
+            'monarchmoney-amazon-tagger-repro_selenium_issue=monarchmoneyamazontagger.repro_mac_issue:main'
         ],
     ),
     cmdclass={

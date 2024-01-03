@@ -29,17 +29,17 @@ from PyQt6.QtWidgets import (
     QPushButton, QTableView, QWidget, QVBoxLayout)
 from outdated import check_outdated
 
-from mintamazontagger import amazon
-from mintamazontagger import tagger
-from mintamazontagger import VERSION
-from mintamazontagger.args import (
+from monarchmoneyamazontagger import amazon
+from monarchmoneyamazontagger import tagger
+from monarchmoneyamazontagger import VERSION
+from monarchmoneyamazontagger.args import (
     define_gui_args, get_name_to_help_dict, TAGGER_BASE_PATH)
-from mintamazontagger.qt import (
+from monarchmoneyamazontagger.qt import (
     MintUpdatesTableModel, AmazonUnmatchedTableDialog, AmazonStatsDialog,
     TaggerStatsDialog)
-from mintamazontagger.mintclient import MintClient
-from mintamazontagger.my_progress import QtProgress
-from mintamazontagger.webdriver import get_webdriver
+from monarchmoneyamazontagger.mintclient import MintClient
+from monarchmoneyamazontagger.my_progress import QtProgress
+from monarchmoneyamazontagger.webdriver import get_webdriver
 
 logger = logging.getLogger(__name__)
 

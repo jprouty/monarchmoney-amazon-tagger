@@ -8,14 +8,14 @@ from pprint import pformat
 import re
 import string
 
-from mintamazontagger import category
-from mintamazontagger.currency import float_usd_to_micro_usd
-from mintamazontagger.currency import micro_usd_nearly_equal
-from mintamazontagger.currency import micro_usd_to_usd_string
-from mintamazontagger.currency import parse_usd_as_micro_usd, round_micro_usd_to_cent
-from mintamazontagger.currency import CENT_MICRO_USD, MICRO_USD_EPS
-from mintamazontagger.mint import truncate_title
-from mintamazontagger.my_progress import no_progress_factory
+from monarchmoneyamazontagger import category
+from monarchmoneyamazontagger.currency import float_usd_to_micro_usd
+from monarchmoneyamazontagger.currency import micro_usd_nearly_equal
+from monarchmoneyamazontagger.currency import micro_usd_to_usd_string
+from monarchmoneyamazontagger.currency import parse_usd_as_micro_usd, round_micro_usd_to_cent
+from monarchmoneyamazontagger.currency import CENT_MICRO_USD, MICRO_USD_EPS
+from monarchmoneyamazontagger.mint import truncate_title
+from monarchmoneyamazontagger.my_progress import no_progress_factory
 
 logger = logging.getLogger(__name__)
 

@@ -6,9 +6,9 @@ from PyQt6.QtGui import QDesktopServices
 from PyQt6.QtWidgets import (
     QAbstractItemView, QDialog, QLabel, QPushButton, QTableView, QVBoxLayout)
 
-from mintamazontagger import amazon
-from mintamazontagger import mint
-from mintamazontagger.currency import micro_usd_to_usd_string
+from monarchmoneyamazontagger import amazon
+from monarchmoneyamazontagger import mint
+from monarchmoneyamazontagger.currency import micro_usd_to_usd_string
 
 
 class MintUpdatesTableModel(QAbstractTableModel):

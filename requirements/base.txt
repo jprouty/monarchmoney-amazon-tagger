@@ -1,13 +1,7 @@
 # Latest PyQt6 has a PyInstaller issue. See: https://github.com/pyinstaller/pyinstaller/issues/7789
 PyQt6==6.4.2
 chardet
-mintapi>=2.12
+# monarchmoney
 outdated
-oathtool
-psutil
 progress
 range-key-dict
-requests
-readchar
-selenium
-selenium-requests>=2.0.3

@@ -1,6 +1,6 @@
 import unittest
 
-from mintamazontagger import currency
+from monarchmoneyamazontagger import currency
 
 
 class CurrencyMethods(unittest.TestCase):
