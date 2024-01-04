@@ -390,6 +390,243 @@ class MonarchMoney(object):
             variables=variables,
         )
 
+    async def get_budgets(
+        self,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        use_legacy_goals: Optional[bool] = False,
+        use_v2_goals: Optional[bool] = True,
+    ) -> Dict[str, Any]:
+        """
+        Get your budgets and corresponding actual amounts from the account.
+
+        When no date arguments given:
+            | `start_date` will default to last month based on todays date
+            | `end_date` will default to next month based on todays date
+
+        :param start_date:
+            the earliest date to get budget data, in "yyyy-mm-dd" format (default: last month)
+        :param end_date:
+            the latest date to get budget data, in "yyyy-mm-dd" format (default: next month)
+        :param use_legacy_goals:
+            Set True to return a list of monthly budget set aside for goals (default: no list)
+        :param use_v2_goals:
+            Set True to return a list of monthly budget set aside for version 2 goals (default list)
+        """
+        query = gql(
+            """
+          query GetJointPlanningData($startDate: Date!, $endDate: Date!, $useLegacyGoals: Boolean!, $useV2Goals: Boolean!) {
+            budgetData(startMonth: $startDate, endMonth: $endDate) {
+              monthlyAmountsByCategory {
+                category {
+                  id
+                  __typename
+                }
+                monthlyAmounts {
+                  month
+                  plannedCashFlowAmount
+                  plannedSetAsideAmount
+                  actualAmount
+                  remainingAmount
+                  previousMonthRolloverAmount
+                  rolloverType
+                  __typename
+                }
+                __typename
+              }
+              monthlyAmountsByCategoryGroup {
+                categoryGroup {
+                  id
+                  __typename
+                }
+                monthlyAmounts {
+                  month
+                  plannedCashFlowAmount
+                  actualAmount
+                  remainingAmount
+                  previousMonthRolloverAmount
+                  rolloverType
+                  __typename
+                }
+                __typename
+              }
+              monthlyAmountsForFlexExpense {
+                budgetVariability
+                monthlyAmounts {
+                  month
+                  plannedCashFlowAmount
+                  actualAmount
+                  remainingAmount
+                  previousMonthRolloverAmount
+                  rolloverType
+                  __typename
+                }
+                __typename
+              }
+              totalsByMonth {
+                month
+                totalIncome {
+                  plannedAmount
+                  actualAmount
+                  remainingAmount
+                  previousMonthRolloverAmount
+                  __typename
+                }
+                totalExpenses {
+                  plannedAmount
+                  actualAmount
+                  remainingAmount
+                  previousMonthRolloverAmount
+                  __typename
+                }
+                totalFixedExpenses {
+                  plannedAmount
+                  actualAmount
+                  remainingAmount
+                  previousMonthRolloverAmount
+                  __typename
+                }
+                totalNonMonthlyExpenses {
+                  plannedAmount
+                  actualAmount
+                  remainingAmount
+                  previousMonthRolloverAmount
+                  __typename
+                }
+                totalFlexibleExpenses {
+                  plannedAmount
+                  actualAmount
+                  remainingAmount
+                  previousMonthRolloverAmount
+                  __typename
+                }
+                __typename
+              }
+              __typename
+            }
+            categoryGroups {
+              id
+              name
+              order
+              groupLevelBudgetingEnabled
+              budgetVariability
+              rolloverPeriod {
+                id
+                startMonth
+                endMonth
+                __typename
+              }
+              categories {
+                id
+                name
+                icon
+                order
+                budgetVariability
+                rolloverPeriod {
+                  id
+                  startMonth
+                  endMonth
+                  __typename
+                }
+                __typename
+              }
+              type
+              __typename
+            }
+            goals @include(if: $useLegacyGoals) {
+              id
+              name
+              icon
+              completedAt
+              targetDate
+              __typename
+            }
+            goalMonthlyContributions(startDate: $startDate, endDate: $endDate) @include(if: $useLegacyGoals) {
+              mount: monthlyContribution
+              startDate
+              goalId
+              __typename
+            }
+            goalPlannedContributions(startDate: $startDate, endDate: $endDate) @include(if: $useLegacyGoals) {
+              id
+              amount
+              startDate
+              goal {
+                id
+                __typename
+              }
+              __typename
+            }
+            goalsV2 @include(if: $useV2Goals) {
+              id
+              name
+              archivedAt
+              completedAt
+              priority
+              imageStorageProvider
+              imageStorageProviderId
+              plannedContributions(startMonth: $startDate, endMonth: $endDate) {
+                id
+                month
+                amount
+                __typename
+              }
+              monthlyContributionSummaries(startMonth: $startDate, endMonth: $endDate) {
+                month
+                sum
+                __typename
+              }
+              __typename
+            }
+            budgetSystem
+          }
+        """
+        )
+
+        variables = {
+            "startDate": start_date,
+            "endDate": end_date,
+            "useLegacyGoals": use_legacy_goals,
+            "useV2Goals": use_v2_goals,
+        }
+
+        if not start_date and not end_date:
+            # Default start_date to last month and end_date to next month
+            today = datetime.today()
+
+            # Get the first day of last month
+            last_month = today.month - 1
+            last_month_year = today.year
+            first_day_of_last_month = 1
+            if last_month < 1:
+                last_month_year -= 1
+                last_month = 12
+            variables["startDate"] = datetime(
+                last_month_year, last_month, first_day_of_last_month
+            ).strftime("%Y-%m-%d")
+
+            # Get the last day of next month
+            next_month = today.month + 1
+            next_month_year = today.year
+            if next_month > 12:
+                next_month_year += 1
+                next_month = 1
+            last_day_of_next_month = calendar.monthrange(next_month_year, next_month)[1]
+            variables["endDate"] = datetime(
+                next_month_year, next_month, last_day_of_next_month
+            ).strftime("%Y-%m-%d")
+
+        elif bool(start_date) != bool(end_date):
+            raise Exception(
+                "You must specify both a startDate and endDate, not just one of them."
+            )
+
+        return await self.gql_call(
+            operation="GetJointPlanningData",
+            graphql_query=query,
+            variables=variables,
+        )
+
     async def get_subscription_details(self) -> Dict[str, Any]:
         """
         The type of subscription for the Monarch Money account.
@@ -624,6 +861,55 @@ class MonarchMoney(object):
             variables=variables,
         )
 
+    async def delete_transaction(self, transaction_id: str) -> bool:
+        """
+        Deletes the given transaction.
+
+        :param transaction_id: the ID of the transaction targeted for deletion.
+        """
+        query = gql(
+            """
+          mutation Common_DeleteTransactionMutation($input: DeleteTransactionMutationInput!) {
+            deleteTransaction(input: $input) {
+              deleted
+              errors {
+                ...PayloadErrorFields
+                __typename
+              }
+              __typename
+            }
+          }
+  
+          fragment PayloadErrorFields on PayloadError {
+            fieldErrors {
+              field
+              messages
+              __typename
+            }
+            message
+            code
+            __typename
+          }
+        """
+        )
+
+        variables = {
+            "input": {
+                "transactionId": transaction_id,
+            },
+        }
+
+        response = await self.gql_call(
+            operation="Common_DeleteTransactionMutation",
+            graphql_query=query,
+            variables=variables,
+        )
+
+        if not response["deleteTransaction"]["deleted"]:
+            raise RequestFailedException(response["deleteTransaction"]["errors"])
+
+        return True
+
     async def get_transaction_categories(self) -> Dict[str, Any]:
         """
         Gets all the categories configured in the account.
@@ -715,7 +1001,7 @@ class MonarchMoney(object):
         Returns detailed information about a transaction.
 
         :param transaction_id: the transaction to fetch.
-        :param redirect_posted: whether to redirect posted transactions.
+        :param redirect_posted: whether to redirect posted transactions. Defaults to True.
         """
         query = gql(
             """
@@ -918,13 +1204,13 @@ class MonarchMoney(object):
         """
         Creates, modifies, or deletes the splits for a given transaction.
 
-        Returns the split information for the updates transaction.
+        Returns the split information for the update transaction.
 
         :param transaction_id: the original transaction to modify.
         :param split_data: the splits to create, modify, or delete.
           If empty list or None is given, all splits will be deleted.
           If split_data is given, all existing splits for transaction_id will be replaced with the new splits.
-          split_data takes the format of [{"merchantName": "...", "amount": -12.34, "categoryId": "231"}, split2, split3, ...]
+          split_data takes the shape: [{"merchantName": "...", "amount": -12.34, "categoryId": "231"}, split2, split3, ...]
           sum([split.amount for split in split_data]) must equal transaction_id.amount.
         """
         query = gql(
@@ -978,8 +1264,7 @@ class MonarchMoney(object):
             split_data = []
 
         variables = {
-            "id": transaction_id,
-            "splitData": split_data
+            "input": {"transactionId": transaction_id, "splitData": split_data}
         }
 
         return await self.gql_call(
@@ -1318,6 +1603,80 @@ class MonarchMoney(object):
 
         return await self.gql_call(
             operation="Web_TransactionDrawerUpdateTransaction",
+            variables=variables,
+            graphql_query=query,
+        )
+
+    async def set_budget_amount(
+        self,
+        amount: float,
+        category_id: Optional[str] = None,
+        category_group_id: Optional[str] = None,
+        timeframe: str = "month",  # I believe this is the only valid value right now
+        start_date: Optional[str] = None,
+        apply_to_future: bool = False,
+    ) -> Dict[str, Any]:
+        """
+        Updates the budget amount for the given category.
+
+        :param category_id:
+            The ID of the category to set the budget for (cannot be provided w/ category_group_id)
+        :param category_group_id:
+            The ID of the category group to set the budget for (cannot be provided w/ category_id)
+        :param amount:
+            The amount to set the budget to. Can be negative (to indicate over-budget). A zero
+            value will "unset" or "clear" the budget for the given category.
+        :param timeframe:
+            The timeframe of the budget. As of writing, it is believed that `month` is the
+            only valid value for this parameter.
+        :param start_date:
+            The beginning of the given timeframe (ex: 2023-12-01). If not specified, then the
+            beginning of today's month will be used.
+        :param apply_to_future:
+            Whether to apply the new budget amount to all proceeding timeframes
+        """
+
+        # Will be true if neither of the parameters are set, or both are
+        if (category_id is None) is (category_group_id is None):
+            raise Exception(
+                "You must specify either a category_id OR category_group_id; not both"
+            )
+
+        query = gql(
+            """
+          mutation Common_UpdateBudgetItem($input: UpdateOrCreateBudgetItemMutationInput!) {
+            updateOrCreateBudgetItem(input: $input) {
+              budgetItem {
+                id
+                budgetAmount
+                __typename
+              }
+              __typename
+            }
+          }
+        """
+        )
+
+        variables = {
+            "input": {
+                "startDate": start_date,
+                "timeframe": timeframe,
+                "categoryId": category_id,
+                "categoryGroupId": category_group_id,
+                "amount": amount,
+                "applyToFuture": apply_to_future,
+            }
+        }
+
+        if start_date is None:
+            current_year = datetime.now().year
+            current_month = datetime.now().month
+            variables["input"]["startDate"] = datetime(
+                current_year, current_month, 1
+            ).strftime("%Y-%m-%d")
+
+        return await self.gql_call(
+            operation="Common_UpdateBudgetItem",
             variables=variables,
             graphql_query=query,
         )
