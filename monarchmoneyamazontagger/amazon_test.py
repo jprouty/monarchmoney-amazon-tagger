@@ -8,22 +8,12 @@ from monarchmoneyamazontagger.mockdata import item
 
 class HelperMethods(unittest.TestCase):
     def test_parse_amazon_date(self):
-        self.assertEqual(
-            amazon.parse_amazon_date('10/8/10'),
-            datetime(2010, 10, 8))
-        self.assertEqual(
-            amazon.parse_amazon_date('1/23/10'),
-            datetime(2010, 1, 23))
-        self.assertEqual(
-            amazon.parse_amazon_date('6/1/01'),
-            datetime(2001, 6, 1))
+        self.assertEqual(amazon.parse_amazon_date("10/8/10"), datetime(2010, 10, 8))
+        self.assertEqual(amazon.parse_amazon_date("1/23/10"), datetime(2010, 1, 23))
+        self.assertEqual(amazon.parse_amazon_date("6/1/01"), datetime(2001, 6, 1))
 
-        self.assertEqual(
-            amazon.parse_amazon_date('07/21/2010'),
-            datetime(2010, 7, 21))
-        self.assertEqual(
-            amazon.parse_amazon_date('1/23/1989'),
-            datetime(1989, 1, 23))
+        self.assertEqual(amazon.parse_amazon_date("07/21/2010"), datetime(2010, 7, 21))
+        self.assertEqual(amazon.parse_amazon_date("1/23/1989"), datetime(1989, 1, 23))
 
 
 # TODO: Revive as a Charge test:
@@ -556,5 +546,5 @@ class HelperMethods(unittest.TestCase):
 #         self.assertEqual(merged[1].item_total, 11950000)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

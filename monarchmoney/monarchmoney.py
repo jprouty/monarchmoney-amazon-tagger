@@ -707,8 +707,10 @@ class MonarchMoney(object):
         return await self.gql_call(
             operation="GetHouseholdTransactionTags", graphql_query=query
         )
-    
-    async def get_transaction_details(self, transaction_id: str, redirect_posted: bool = True) -> Dict[str, Any]:
+
+    async def get_transaction_details(
+        self, transaction_id: str, redirect_posted: bool = True
+    ) -> Dict[str, Any]:
         """
         Returns detailed information about a transaction.
 
@@ -904,15 +906,15 @@ class MonarchMoney(object):
         """
         )
 
-        variables = {
-            "id": transaction_id
-        }
+        variables = {"id": transaction_id}
 
         return await self.gql_call(
             operation="TransactionSplitQuery", variables=variables, graphql_query=query
         )
 
-    async def update_transaction_splits(self, transaction_id: str, split_data: List[Dict[str, Any]]) -> Dict[str, Any]:
+    async def update_transaction_splits(
+        self, transaction_id: str, split_data: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
         """
         Creates, modifies, or deletes the splits for a given transaction.
 
@@ -975,13 +977,12 @@ class MonarchMoney(object):
         if split_data is None:
             split_data = []
 
-        variables = {
-            "id": transaction_id,
-            "splitData": split_data
-        }
+        variables = {"id": transaction_id, "splitData": split_data}
 
         return await self.gql_call(
-            operation="Common_SplitTransactionMutation", variables=variables, graphql_query=query
+            operation="Common_SplitTransactionMutation",
+            variables=variables,
+            graphql_query=query,
         )
 
     async def get_cashflow(

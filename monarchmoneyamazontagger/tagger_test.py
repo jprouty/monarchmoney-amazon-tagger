@@ -59,6 +59,7 @@ class Tagger(unittest.TestCase):
             MINT_CATEGORIES)
         self.assertEqual(len(updates), 0)
 
+
     # TODO: REVIVE
     # def test_get_mint_updates_simple_match(self):
     #     i1 = item()

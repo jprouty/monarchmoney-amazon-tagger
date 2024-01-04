@@ -8,65 +8,70 @@ import os
 
 from monarchmoneyamazontagger import category
 from monarchmoneyamazontagger.currency import (
-    micro_usd_to_usd_string, parse_float_usd_as_micro_usd,
-    round_micro_usd_to_cent)
+    micro_usd_to_usd_string,
+    parse_float_usd_as_micro_usd,
+    round_micro_usd_to_cent,
+)
 from monarchmoneyamazontagger.my_progress import NoProgress
 
 logger = logging.getLogger(__name__)
 
+
 def truncate_title(title, target_length, base_str=None):
     words = []
     if base_str:
-        words.extend([w for w in base_str.split(' ') if w])
+        words.extend([w for w in base_str.split(" ") if w])
         target_length -= len(base_str)
-    for word in title.strip().split(' '):
+    for word in title.strip().split(" "):
         if len(word) / 2 < target_length:
             words.append(word)
             target_length -= len(word) + 1
         else:
             break
-    truncated = ' '.join(words)
+    truncated = " ".join(words)
     # Remove any trailing symbol-y crap.
-    while truncated and truncated[-1] in ',.-([]{}\\/|~!@#$%^&*_+=`\'" ':
+    while truncated and truncated[-1] in ",.-([]{}\\/|~!@#$%^&*_+=`'\" ":
         truncated = truncated[:-1]
     return truncated
 
 
 # Credit: https://stackoverflow.com/questions/1175208
-first_cap_re = re.compile('(.)([A-Z][a-z]+)')
-all_cap_re = re.compile('([a-z0-9])([A-Z])')
+first_cap_re = re.compile("(.)([A-Z][a-z]+)")
+all_cap_re = re.compile("([a-z0-9])([A-Z])")
 
 
 def convertCamel_to_underscores(name):
-    s1 = first_cap_re.sub(r'\1_\2', name)
-    return all_cap_re.sub(r'\1_\2', s1).lower()
+    s1 = first_cap_re.sub(r"\1_\2", name)
+    return all_cap_re.sub(r"\1_\2", s1).lower()
 
 
 def convert_camel_dict(raw_dict):
-    return dict([
-        (convertCamel_to_underscores(k.replace(' ', '_')), v)
-        for k, v in raw_dict.items()
-    ])
+    return dict(
+        [
+            (convertCamel_to_underscores(k.replace(" ", "_")), v)
+            for k, v in raw_dict.items()
+        ]
+    )
 
 
 def pythonify_mint_transaction_dict(raw_dict, is_fi_data=False):
     # Parse out the date field into a datetime.date object.
-    raw_dict['date'] = parse_mint_date(raw_dict['date'])
+    raw_dict["date"] = parse_mint_date(raw_dict["date"])
 
     # Parse the float value into micro usd.
-    raw_dict['amount'] = parse_float_usd_as_micro_usd(raw_dict['amount'])
+    raw_dict["amount"] = parse_float_usd_as_micro_usd(raw_dict["amount"])
 
     if is_fi_data:
-        if 'inferredCategory' in raw_dict:
-            raw_dict['inferredCategory'] = Category(raw_dict['inferredCategory'])
+        if "inferredCategory" in raw_dict:
+            raw_dict["inferredCategory"] = Category(raw_dict["inferredCategory"])
     else:
-        if 'category' not in raw_dict:
-            logger.fatal(f'No category for mint transaction: {raw_dict}')
-        raw_dict['category'] = Category(raw_dict['category'])
-        raw_dict['fiData'] = FinancialInstitutionData(raw_dict['fiData'])
+        if "category" not in raw_dict:
+            logger.fatal(f"No category for mint transaction: {raw_dict}")
+        raw_dict["category"] = Category(raw_dict["category"])
+        raw_dict["fiData"] = FinancialInstitutionData(raw_dict["fiData"])
         # Ensure the notes field is always present (None if not present).
-        raw_dict['notes'] = raw_dict.get('notes')
-        raw_dict['parentId'] = raw_dict.get('parentId')
+        raw_dict["notes"] = raw_dict.get("notes")
+        raw_dict["parentId"] = raw_dict.get("parentId")
 
     return convert_camel_dict(raw_dict)
 
@@ -76,7 +81,7 @@ def pythonify_mint_category_dict(raw_dict):
 
 
 def parse_mint_date(date_str):
-    return datetime.strptime(date_str, '%Y-%m-%d').date()
+    return datetime.strptime(date_str, "%Y-%m-%d").date()
 
 
 class Category(object):
@@ -87,10 +92,10 @@ class Category(object):
 
     def update_category_id(self, mint_categories):
         if self.name in mint_categories:
-            self.id = mint_categories[self.name]['id']
+            self.id = mint_categories[self.name]["id"]
 
     def __repr__(self):
-        return f'{self.name}({self.id})'
+        return f"{self.name}({self.id})"
 
 
 class Transaction(object):
@@ -116,7 +121,7 @@ class Transaction(object):
         item.children = []
 
         item.amount = amount
-        item.category = Category({'name': category_name, 'id': None})
+        item.category = Category({"name": category_name, "id": None})
         item.description = description
         item.notes = notes
 
@@ -137,24 +142,23 @@ class Transaction(object):
         """Returns a 3-tuple used to determine if 2 transactions are equal."""
         # TODO: Add the 'note' field once itemized transactions include notes.
         # Use str to avoid float cmp.
-        base = (
-            self.description,
-            micro_usd_to_usd_string(self.amount),
-            self.notes)
+        base = (self.description, micro_usd_to_usd_string(self.amount), self.notes)
         return base if ignore_category else base + (self.category.name,)
 
     def dry_run_str(self, ignore_category=False):
         return (
             f'{self.date.strftime("%Y-%m-%d")} \t'
-            f'{micro_usd_to_usd_string(self.amount)} \t'
+            f"{micro_usd_to_usd_string(self.amount)} \t"
             f'{"--IGNORED--" if ignore_category else self.category} \t'
-            f'{self.description}')
+            f"{self.description}"
+        )
 
     def __repr__(self):
         return (
-            f'Mint Trans({self.id}): {micro_usd_to_usd_string(self.amount)} '
-            f'{self.date} {self.description} {self.category} '
-            f'{"with notes" if self.notes else ""}')
+            f"Mint Trans({self.id}): {micro_usd_to_usd_string(self.amount)} "
+            f"{self.date} {self.description} {self.category} "
+            f'{"with notes" if self.notes else ""}'
+        )
 
     @classmethod
     def parse_from_json(cls, json_dicts, progress=NoProgress()):
@@ -184,8 +188,7 @@ class Transaction(object):
 
             parent.id = parent_id
             parent.bastardize()
-            parent.amount = round_micro_usd_to_cent(
-                Transaction.sum_amounts(children))
+            parent.amount = round_micro_usd_to_cent(Transaction.sum_amounts(children))
             parent.children = children
 
             result.append(parent)
@@ -198,7 +201,8 @@ class Transaction(object):
         old_set = set(
             [c.get_compare_tuple(ignore_category) for c in old.children]
             if old.children
-            else [old.get_compare_tuple(ignore_category)])
+            else [old.get_compare_tuple(ignore_category)]
+        )
         new_set = set([t.get_compare_tuple(ignore_category) for t in new])
         return old_set == new_set
 
@@ -211,9 +215,10 @@ class FinancialInstitutionData(object):
 
     def __repr__(self):
         return (
-            f'Mint FI Trans: '
-            f'{micro_usd_to_usd_string(self.amount)} {self.date} '
-            f'{self.description} ({self.inferred_description}) {self.inferred_category}')
+            f"Mint FI Trans: "
+            f"{micro_usd_to_usd_string(self.amount)} {self.date} "
+            f"{self.description} ({self.inferred_description}) {self.inferred_category}"
+        )
 
 
 def itemize_new_trans(new_trans, prefix):
@@ -227,17 +232,14 @@ def itemize_new_trans(new_trans, prefix):
     return new_trans[::-1]
 
 
-NON_ITEM_DESCRIPTIONS = set([
-    'Misc Charge (Gift wrap, etc)',
-    'Promotion(s)',
-    'Shipping',
-    'Tax adjustment'])
+NON_ITEM_DESCRIPTIONS = set(
+    ["Misc Charge (Gift wrap, etc)", "Promotion(s)", "Shipping", "Tax adjustment"]
+)
 
 
 def summarize_title(titles, prefix):
     trun_len = (100 - len(prefix) - 2 * len(titles)) / len(titles)
-    return prefix + (', '.join(
-        [truncate_title(t, trun_len) for t in titles]))
+    return prefix + (", ".join([truncate_title(t, trun_len) for t in titles]))
 
 
 def summarize_new_trans(t, new_trans, prefix):
@@ -245,20 +247,23 @@ def summarize_new_trans(t, new_trans, prefix):
     # the full information in the transaction notes. Category is untouched when
     # there's more than one item (this is why itemizing is better!).
     title = summarize_title(
-        [nt.description
-         for nt in new_trans
-         if nt.description not in NON_ITEM_DESCRIPTIONS],
-        prefix)
-    notes = '{}\nItem(s):\n{}'.format(
-        new_trans[0].notes,
-        '\n'.join(
-            [' - ' + nt.description
-             for nt in new_trans]))
+        [
+            nt.description
+            for nt in new_trans
+            if nt.description not in NON_ITEM_DESCRIPTIONS
+        ],
+        prefix,
+    )
+    notes = "{}\nItem(s):\n{}".format(
+        new_trans[0].notes, "\n".join([" - " + nt.description for nt in new_trans])
+    )
 
     summary_trans = deepcopy(t)
     summary_trans.description = title
-    if len([nt for nt in new_trans
-            if nt.description not in NON_ITEM_DESCRIPTIONS]) == 1:
+    if (
+        len([nt for nt in new_trans if nt.description not in NON_ITEM_DESCRIPTIONS])
+        == 1
+    ):
         summary_trans.category = new_trans[0].category
     else:
         summary_trans.category.name = category.DEFAULT_MINT_CATEGORY
@@ -266,18 +271,20 @@ def summarize_new_trans(t, new_trans, prefix):
     return [summary_trans]
 
 
-MINT_TRANS_PICKLE_FMT = 'Mint {} Transactions.pickle'
-MINT_CATS_PICKLE_FMT = 'Mint {} Categories.pickle'
+MINT_TRANS_PICKLE_FMT = "Mint {} Transactions.pickle"
+MINT_CATS_PICKLE_FMT = "Mint {} Categories.pickle"
 
 
 def get_trans_and_categories_from_pickle(pickle_epoch, pickle_base_path):
     trans_pickle_path = os.path.join(
-        pickle_base_path, MINT_TRANS_PICKLE_FMT.format(pickle_epoch))
+        pickle_base_path, MINT_TRANS_PICKLE_FMT.format(pickle_epoch)
+    )
     cats_pickle_path = os.path.join(
-        pickle_base_path, MINT_CATS_PICKLE_FMT.format(pickle_epoch))
-    with open(trans_pickle_path, 'rb') as f:
+        pickle_base_path, MINT_CATS_PICKLE_FMT.format(pickle_epoch)
+    )
+    with open(trans_pickle_path, "rb") as f:
         trans = pickle.load(f)
-    with open(cats_pickle_path, 'rb') as f:
+    with open(cats_pickle_path, "rb") as f:
         cats = pickle.load(f)
     return trans, cats
 
@@ -286,10 +293,12 @@ def dump_trans_and_categories(trans, cats, pickle_epoch, pickle_base_path):
     if not os.path.exists(pickle_base_path):
         os.makedirs(pickle_base_path)
     trans_pickle_path = os.path.join(
-        pickle_base_path, MINT_TRANS_PICKLE_FMT.format(pickle_epoch))
+        pickle_base_path, MINT_TRANS_PICKLE_FMT.format(pickle_epoch)
+    )
     cats_pickle_path = os.path.join(
-        pickle_base_path, MINT_CATS_PICKLE_FMT.format(pickle_epoch))
-    with open(trans_pickle_path, 'wb') as f:
+        pickle_base_path, MINT_CATS_PICKLE_FMT.format(pickle_epoch)
+    )
+    with open(trans_pickle_path, "wb") as f:
         pickle.dump(trans, f)
-    with open(cats_pickle_path, 'wb') as f:
+    with open(cats_pickle_path, "wb") as f:
         pickle.dump(cats, f)

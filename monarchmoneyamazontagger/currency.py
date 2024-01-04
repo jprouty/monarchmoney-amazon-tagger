@@ -31,7 +31,8 @@ def float_usd_to_micro_usd(float_usd):
 def micro_usd_to_usd_string(micro_usd):
     return (
         f"{'' if micro_usd >= -5000 else '-'}$"
-        f"{micro_usd_to_float_usd(abs(micro_usd)):.2f}")
+        f"{micro_usd_to_float_usd(abs(micro_usd)):.2f}"
+    )
 
 
 def parse_usd_as_micro_usd(amount):
@@ -49,14 +50,14 @@ def parse_usd_as_float(amount):
     if type(amount) == float:
         return amount
     # Remove any formatting/grouping commas.
-    amount = amount.replace(',', '')
+    amount = amount.replace(",", "")
     # Remove any quoting.
-    amount = amount.replace('\'', '')
+    amount = amount.replace("'", "")
     negate = False
-    if '-' == amount[0]:
+    if "-" == amount[0]:
         negate = True
         amount = amount[1:]
-    if '$' == amount[0]:
+    if "$" == amount[0]:
         amount = amount[1:]
     try:
         return float(amount) if not negate else -float(amount)

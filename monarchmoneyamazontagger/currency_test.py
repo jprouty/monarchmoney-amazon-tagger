@@ -35,7 +35,6 @@ class CurrencyMethods(unittest.TestCase):
         self.assertEqual(currency.round_micro_usd_to_cent(-33120000), -33120000)
         self.assertEqual(currency.round_micro_usd_to_cent(-67070000), -67070000)
 
-
     def test_micro_usd_to_float_usd(self):
         self.assertEqual(currency.micro_usd_to_float_usd(5050500), 5.05)
         self.assertEqual(currency.micro_usd_to_float_usd(150500), 0.15)
@@ -46,27 +45,27 @@ class CurrencyMethods(unittest.TestCase):
         self.assertEqual(currency.float_usd_to_micro_usd(32.94), 32940000)
 
     def test_micro_usd_to_usd_string(self):
-        self.assertEqual(currency.micro_usd_to_usd_string(1230040), '$1.23')
-        self.assertEqual(currency.micro_usd_to_usd_string(-123000), '-$0.12')
-        self.assertEqual(currency.micro_usd_to_usd_string(-1900), '$0.00')
-        self.assertEqual(currency.micro_usd_to_usd_string(-10000), '-$0.01')
+        self.assertEqual(currency.micro_usd_to_usd_string(1230040), "$1.23")
+        self.assertEqual(currency.micro_usd_to_usd_string(-123000), "-$0.12")
+        self.assertEqual(currency.micro_usd_to_usd_string(-1900), "$0.00")
+        self.assertEqual(currency.micro_usd_to_usd_string(-10000), "-$0.01")
 
     def test_parse_usd_as_micro_usd(self):
-        self.assertEqual(currency.parse_usd_as_micro_usd('$1.23'), 1230000)
-        self.assertEqual(currency.parse_usd_as_micro_usd('$0.00'), 0)
-        self.assertEqual(currency.parse_usd_as_micro_usd('-$0.00'), 0)
-        self.assertEqual(currency.parse_usd_as_micro_usd('$55'), 55000000)
-        self.assertEqual(currency.parse_usd_as_micro_usd('$12.23'), 12230000)
-        self.assertEqual(currency.parse_usd_as_micro_usd('-$12.23'), -12230000)
+        self.assertEqual(currency.parse_usd_as_micro_usd("$1.23"), 1230000)
+        self.assertEqual(currency.parse_usd_as_micro_usd("$0.00"), 0)
+        self.assertEqual(currency.parse_usd_as_micro_usd("-$0.00"), 0)
+        self.assertEqual(currency.parse_usd_as_micro_usd("$55"), 55000000)
+        self.assertEqual(currency.parse_usd_as_micro_usd("$12.23"), 12230000)
+        self.assertEqual(currency.parse_usd_as_micro_usd("-$12.23"), -12230000)
 
     def test_parse_usd_as_float(self):
-        self.assertEqual(currency.parse_usd_as_float('$1.23'), 1.23)
-        self.assertEqual(currency.parse_usd_as_float('$0.00'), 0)
-        self.assertEqual(currency.parse_usd_as_float('-$0.00'), 0)
-        self.assertEqual(currency.parse_usd_as_float('$55'), 55.0)
-        self.assertEqual(currency.parse_usd_as_float('$12.23'), 12.23)
-        self.assertEqual(currency.parse_usd_as_float('-$12.23'), -12.23)
+        self.assertEqual(currency.parse_usd_as_float("$1.23"), 1.23)
+        self.assertEqual(currency.parse_usd_as_float("$0.00"), 0)
+        self.assertEqual(currency.parse_usd_as_float("-$0.00"), 0)
+        self.assertEqual(currency.parse_usd_as_float("$55"), 55.0)
+        self.assertEqual(currency.parse_usd_as_float("$12.23"), 12.23)
+        self.assertEqual(currency.parse_usd_as_float("-$12.23"), -12.23)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

@@ -68,4 +68,4 @@ def determinate_progress_cli(msg, max):
 
 
 def counter_progress_cli(msg, max=0):
-    return Counter(msg + ' - ')
+    return Counter(msg + " - ")
