@@ -922,7 +922,7 @@ class MonarchMoney(object):
         :param split_data: the splits to create, modify, or delete.
           If empty list or None is given, all splits will be deleted.
           If split_data is given, all existing splits for transaction_id will be replaced with the new splits.
-          split_data takes the format of [{"merchantName": ..., "amount": ..., "categoryId": ...}, split2, split3, ...]
+          split_data takes the format of [{"merchantName": "...", "amount": -12.34, "categoryId": "231"}, split2, split3, ...]
           sum([split.amount for split in split_data]) must equal transaction_id.amount.
         """
         query = gql(
@@ -976,8 +976,10 @@ class MonarchMoney(object):
             split_data = []
 
         variables = {
-            "id": transaction_id,
-            "splitData": split_data
+            "input": {
+                "transactionId": transaction_id,
+                "splitData": split_data
+            }
         }
 
         return await self.gql_call(
