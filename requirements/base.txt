@@ -1,7 +1,10 @@
 # Latest PyQt6 has a PyInstaller issue. See: https://github.com/pyinstaller/pyinstaller/issues/7789
 PyQt6==6.4.2
+aiohttp
 chardet
+gql
 # monarchmoney
+oathtool
 outdated
 progress
 range-key-dict
