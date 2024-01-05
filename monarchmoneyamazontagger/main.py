@@ -37,7 +37,7 @@ from monarchmoneyamazontagger.args import (
 from monarchmoneyamazontagger.qt import (
     MintUpdatesTableModel, AmazonUnmatchedTableDialog, AmazonStatsDialog,
     TaggerStatsDialog)
-from monarchmoneyamazontagger.mintclient import MintClient
+from monarchmoneyamazontagger.mmclient import MintClient
 from monarchmoneyamazontagger.my_progress import QtProgress
 from monarchmoneyamazontagger.webdriver import get_webdriver
 

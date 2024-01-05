@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import os
 from pprint import pprint
@@ -6,87 +7,36 @@ import time
 
 from monarchmoneyamazontagger.currency import micro_usd_to_float_usd
 
-from mintapi.api import Mint
-
-from selenium.common.exceptions import StaleElementReferenceException, TimeoutException
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
+from monarchmoney import MonarchMoney
 
 logger = logging.getLogger(__name__)
 
-MINT_HOME = "https://mint.intuit.com"
-MINT_OVERVIEW = f"{MINT_HOME}/overview"
-MINT_API_ENDPOINT = f"{MINT_HOME}/pfm"
-MINT_API_VERSION = "v1"
-MINT_TRANSACTIONS = f"{MINT_API_ENDPOINT}/{MINT_API_VERSION}/transactions"
-MINT_CATEGORIES = f"{MINT_API_ENDPOINT}/{MINT_API_VERSION}/categories"
 
-
-class MintClient:
+class MonarchMoneyClient:
     args = None
-    webdriver_factory = None
-    webdriver = None
-    mint_api = None
-    # To signify a successful user login when args.mint_user_will_login is present.
+    mm = None
+    # To signify a successful user login when args.mm_user_will_login is present.
     user_login_success = False
 
-    def __init__(self, args, webdriver_factory, mfa_input_callback=None):
+    def __init__(self, args):
         self.args = args
-        self.webdriver_factory = webdriver_factory
-        self.mfa_input_callback = mfa_input_callback
 
     def hasValidCredentialsForLogin(self):
-        if self.args.mint_user_will_login:
-            return True
-        return self.args.mint_email and self.args.mint_password
-
-    def get_api_header(self):
-        # Defer to MintAPI if present.
-        if self.mint_api:
-            return self.mint_api._get_api_key_header()
-        # Otherwise, attempt ourselves (needed in the case of args.mint_user_will_login).
-        return _get_api_header(self.webdriver)
+        return self.args.mm_email and self.args.mm_password
 
     def is_logged_in(self):
-        return self.mint_api or self.user_login_success
+        return self.mm is not None
 
     def login(self):
         if self.is_logged_in():
             return True
         if not self.hasValidCredentialsForLogin():
-            logger.error("Missing Mint email or password.")
+            logger.error("Missing Monarch Money email or password.")
             return False
 
-        self.webdriver = self.webdriver_factory()
-
-        if self.args.mint_user_will_login:
-            logger.info("Mint Login Flow: login to be performed manually by the user")
-            self.webdriver.get(MINT_HOME)
-            self.user_login_success = _await_user_login(
-                self.webdriver, self.args.mint_login_timeout
-            )
-        else:
-            logger.info("Mint Login Flow: MintAPI to complete login")
-            logger.info(
-                "You may be asked for an auth code at the command line! "
-                "Be sure to press ENTER after typing the 6 digit code."
-            )
-            self.mint_api = Mint(
-                driver=self.webdriver,
-                email=self.args.mint_email,
-                password=self.args.mint_password,
-                mfa_method=self.args.mint_mfa_preferred_method,
-                mfa_token=self.args.mint_mfa_soft_token,
-                mfa_input_callback=self.mfa_input_callback,
-                intuit_account=self.args.mint_intuit_account,
-                wait_for_sync=self.args.mint_wait_for_sync,
-                wait_for_sync_timeout=self.args.mint_sync_timeout,
-                quit_driver_on_fail=False,
-            )
-        # Use our own wait for sync logic in both cases, to protect making api calls too soon.
-        _wait_for_overview_loaded(self.webdriver, self.args.mint_wait_for_sync)
-        return self.is_logged_in()
+        self.mm = MonarchMoney()
+        asyncio.run(self.mm.login(self.args.mm_email, self.args.mm_password))
+        return True
 
     def get_transactions(self, from_date=None, to_date=None):
         if not self.login():

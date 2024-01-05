@@ -27,7 +27,7 @@ from monarchmoneyamazontagger.my_progress import (
     indeterminate_progress_cli,
 )
 from monarchmoneyamazontagger.currency import micro_usd_to_usd_string
-from monarchmoneyamazontagger.mintclient import MintClient
+from monarchmoneyamazontagger.mmclient import MintClient
 from monarchmoneyamazontagger.webdriver import get_webdriver
 
 logger = logging.getLogger(__name__)
