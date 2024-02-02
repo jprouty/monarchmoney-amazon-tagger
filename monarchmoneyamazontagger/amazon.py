@@ -1,6 +1,7 @@
 from copy import deepcopy
 import csv
 from datetime import datetime, timezone
+from typing import List, Optional
 from dateutil import parser
 import io
 import logging
@@ -9,15 +10,8 @@ import re
 import string
 
 from monarchmoneyamazontagger import category
-from monarchmoneyamazontagger.currency import float_usd_to_micro_usd
-from monarchmoneyamazontagger.currency import micro_usd_nearly_equal
-from monarchmoneyamazontagger.currency import micro_usd_to_usd_string
-from monarchmoneyamazontagger.currency import (
-    parse_usd_as_micro_usd,
-    round_micro_usd_to_cent,
-)
-from monarchmoneyamazontagger.currency import CENT_MICRO_USD, MICRO_USD_EPS
-from monarchmoneyamazontagger.mint import truncate_title
+from monarchmoneyamazontagger.micro_usd import MicroUSD, CENT_MICRO_USD, MICRO_USD_EPS
+from monarchmoneyamazontagger.mm import truncate_title
 from monarchmoneyamazontagger.my_progress import no_progress_factory
 
 logger = logging.getLogger(__name__)
@@ -81,7 +75,7 @@ MULTI_SPLIT_BY_AND = set(
 
 
 def parse_from_csv_common(
-    cls, csv_file, progress_label="Parse from csv", progress_factory=no_progress_factory
+    cls, csv_file, progress_label="Parse from CSV", progress_factory=no_progress_factory
 ):
     # contents = csv_file.read().decode()
     contents = csv_file.read().decode("utf-8")
@@ -96,72 +90,32 @@ def parse_from_csv_common(
 
     progress = progress_factory(progress_label, num_records)
     reader = csv.DictReader(io.StringIO(contents))
-    for raw_dict in reader:
-        result.append(cls(raw_dict))
+    # Convert input fieldnames into pythonic names. Feels somewhat naughty but works:
+    reader.fieldnames = [
+        fn.replace('"', "").replace(" ", "_").replace("&", "and").lower()
+        for fn in reader.fieldnames
+    ]
+    for csv_dict in reader:
+        result.append(cls(**csv_dict))
         progress.next()
     progress.finish()
     return result
 
 
-def pythonify_amazon_dict(raw_dict):
-    keys = set(raw_dict.keys())
-
-    if "Quantity" in keys:
-        raw_dict["Quantity"] = int(raw_dict["Quantity"])
-
-    # Convert to microdollar ints
-    for ck in keys & CURRENCY_FIELD_NAMES:
-        raw_dict[ck] = parse_usd_as_micro_usd(raw_dict[ck])
-
-    # Split fields with multiples by " and ":
-    for split_key in keys & MULTI_SPLIT_BY_AND:
-        raw_dict[split_key] = raw_dict[split_key].split(" and ")
-
-    # Convert to datetime.date
-    for dk in keys & DATE_FIELD_NAMES:
-        raw_dict[dk] = [parse_amazon_date(d) for d in raw_dict[dk]]
-
-    # Rename long or unpythonic names:
-    for old_key in keys & RENAME_FIELD_NAMES.keys():
-        new_key = RENAME_FIELD_NAMES[old_key]
-        raw_dict[new_key] = raw_dict[old_key]
-        del raw_dict[old_key]
-
-    return dict(
-        [
-            (k.lower().replace(" ", "_").replace("/", "_"), v)
-            for k, v in raw_dict.items()
-        ]
-    )
-
-
-# TODO: Consider if we want to retain the time.
-def parse_amazon_date(date_str):
+def parse_amazon_date(date_str: str) -> datetime | None:
     if not date_str or date_str == "Not Available":
         return None
     return parser.parse(date_str)
-    # return datetime.strptime(date_str, '%Y-%m-%dT%H:%M:%S.Z').date()
 
 
-def get_invoice_url(order_id):
+def get_invoice_url(order_id: str) -> str:
     return (
         "https://www.amazon.com/gp/css/summary/print.html?ie=UTF8&"
         f"orderID={order_id}"
     )
 
 
-# ORDER_MERGE_FIELDS = {
-#     'original_shipping_charge',
-#     'shipping_charge',
-#     'subtotal',
-#     'tax_before_promotions',
-#     'tax_charged',
-#     'total_charged',
-#     'total_discounts',
-# }
-
-
-def datetime_list_to_dates_str(dates):
+def datetime_list_to_dates_str(dates: List[datetime]) -> str:
     return ", ".join([d.strftime("%Y-%m-%d") for d in dates])
 
 
@@ -212,10 +166,10 @@ class Charge:
             and max(ship_dates) >= datetime(2022, 7, 1, tzinfo=timezone.utc)
         )
 
-    def hidden_shipping_fee(self):
-        return float_usd_to_micro_usd(0.27)
+    def hidden_shipping_fee(self) -> MicroUSD:
+        return MicroUSD.from_float(0.27)
 
-    def hidden_shipping_fee_note(self):
+    def hidden_shipping_fee_note(self) -> str:
         return "CO Retail Delivery Fee"
 
     def total_by_items(self):
@@ -311,11 +265,9 @@ class Charge:
         #
         #     return self.items[0].ship_date[0].astimezone().date()
 
-    def transact_amount(self):
+    def transact_amount(self) -> MicroUSD:
         if self.has_hidden_shipping_fee():
-            return -round_micro_usd_to_cent(
-                self.total_owed() + self.hidden_shipping_fee()
-            )
+            return -(self.total_owed() + self.hidden_shipping_fee()).round_to_cent()
         return -self.total_owed()
 
     def match(self, trans):
@@ -388,7 +340,7 @@ class Charge:
         adjustments = 0
         for i in self.items:
             item_diff = i.total_owed_by_parts() - i.total_owed
-            if micro_usd_nearly_equal(item_diff, i.shipping_charge):
+            if item_diff == i.shipping_charge:
                 i.shipping_charge = 0
                 adjustments += 1
         return adjustments > 0
@@ -419,7 +371,6 @@ class Charge:
 
         # Itemize line-items:
         for i in items:
-            # new_cat = category.get_mint_category_from_unspsc(i.unspsc_code)
             item = t.split(
                 amount=-i.total(),
                 category_name=t.category.name,
@@ -441,7 +392,7 @@ class Charge:
         is_free_shipping = (
             self.shipping_charge()
             and self.total_discounts()
-            and micro_usd_nearly_equal(self.total_discounts(), self.shipping_charge())
+            and self.total_discounts() == self.shipping_charge()
         )
 
         if is_free_shipping and skip_free_shipping:
@@ -467,7 +418,7 @@ class Charge:
             # shipping that was e.g. $2.99 and then comp'd is no longer
             # included in these reports (discounts and shipping are both zero'd
             # out).
-            cat = "Shipping" if is_free_shipping else category.DEFAULT_MINT_CATEGORY
+            cat = "Shipping" if is_free_shipping else category.DEFAULT_CATEGORY
             promo = t.split(
                 amount=-self.total_discounts(),
                 category_name=cat,
@@ -495,14 +446,23 @@ class Charge:
     def __repr__(self):
         return (
             f"Charge ({self.order_id()}): {self.ship_dates() or self.order_dates()}"
-            f" Total {micro_usd_to_usd_string(self.total_owed())}\t"
-            f" Total by part {micro_usd_to_usd_string(self.total_by_items())}\t"
-            f"Subtotal {micro_usd_to_usd_string(self.subtotal())}\t"
-            f"Tax {micro_usd_to_usd_string(self.tax())}\t"
-            f"Promo {micro_usd_to_usd_string(self.total_discounts())}\t"
-            f"Ship {micro_usd_to_usd_string(self.shipping_charge())}\t"
+            f" Total {str(self.total_owed())}\t"
+            f" Total by part {str(self.total_by_items())}\t"
+            f"Subtotal {str(self.subtotal())}\t"
+            f"Tax {str(self.tax())}\t"
+            f"Promo {str(self.total_discounts())}\t"
+            f"Ship {str(self.shipping_charge())}\t"
             f"Items: \n{pformat(self.items)}"
         )
+
+
+MULTI_VALUE_SPLIT = " and "
+
+
+def parse_optional(value: str) -> Optional[str]:
+    if value == "Not Available":
+        return None
+    return value
 
 
 class Item:
@@ -516,11 +476,120 @@ class Item:
     total_owed = shipment_item_total + shipping_charge + total_discounts
     """
 
-    matched = False
-    order = None
+    # Fields in order as they appear in CSV export
 
-    def __init__(self, raw_dict):
-        self.__dict__.update(pythonify_amazon_dict(raw_dict))
+    website: str
+    order_id: str
+    order_date: List[datetime]  # Example: "2023-12-31T00:21:42Z"
+    purchase_order_number: Optional[str]
+    currency: str
+    unit_price: MicroUSD
+    unit_price_tax: MicroUSD
+    shipping_charge: MicroUSD
+    total_discounts: MicroUSD
+    total_owed: MicroUSD
+    shipment_item_subtotal: Optional[MicroUSD]
+    shipment_item_subtotal_tax: Optional[MicroUSD]
+    asin: str
+    product_condition: str
+    quantity: int
+    payment_instrument_type: List[str]
+    order_status: str
+    shipment_status: Optional[str]
+    ship_date: List[datetime]  # "2023-12-31T10:21:37Z"
+    shipping_option: str  # Example: "expd-consolidated-us"
+    shipping_address: str
+    billing_address: str
+    carrier_name_and_tracking_number: List[str]  # Example: "AMZN_US(TBA310866232294)"
+    product_name: str
+    gift_message: Optional[str]
+    gift_sender_name: Optional[str]
+    gift_recipient_contact_details: Optional[str]
+
+    def __init__(
+        self,
+        website,
+        order_id,
+        order_date,
+        purchase_order_number,
+        currency,
+        unit_price,
+        unit_price_tax,
+        shipping_charge,
+        total_discounts,
+        total_owed,
+        shipment_item_subtotal,
+        shipment_item_subtotal_tax,
+        asin,
+        product_condition,
+        quantity,
+        payment_instrument_type,
+        order_status,
+        shipment_status,
+        ship_date,
+        shipping_option,
+        shipping_address,
+        billing_address,
+        carrier_name_and_tracking_number,
+        product_name,
+        gift_message,
+        gift_sender_name,
+        gift_recipient_contact_details,
+    ):
+        self.website = website
+        self.order_id = order_id
+        self.order_date = [
+            parse_amazon_date(d)
+            for d in order_date.split(MULTI_VALUE_SPLIT)
+            if parse_amazon_date(d)
+        ]  # type: ignore
+        self.purchase_order_number = (
+            None
+            if purchase_order_number == "Not Applicable"
+            else parse_optional(purchase_order_number)
+        )
+        self.currency = currency
+        self.unit_price = MicroUSD.parse(unit_price)
+        self.unit_price_tax = MicroUSD.parse(unit_price_tax)
+        self.shipping_charge = MicroUSD.parse(shipping_charge)
+        self.total_discounts = MicroUSD.parse(total_discounts)
+        self.total_owed = MicroUSD.parse(total_owed)
+        shipment_item_subtotal = parse_optional(shipment_item_subtotal)
+        shipment_item_subtotal_tax = parse_optional(shipment_item_subtotal_tax)
+        self.shipment_item_subtotal = (
+            MicroUSD.parse(shipment_item_subtotal)
+            if parse_optional(shipment_item_subtotal)
+            else None
+        )
+        self.shipment_item_subtotal_tax = (
+            MicroUSD.parse(shipment_item_subtotal_tax)
+            if parse_optional(shipment_item_subtotal_tax)
+            else None
+        )
+        self.asin = asin
+        self.product_condition = product_condition
+        self.quantity = int(quantity)
+        self.payment_instrument_type = payment_instrument_type.split(MULTI_VALUE_SPLIT)
+        self.order_status = order_status
+        self.shipment_status = parse_optional(shipment_status)
+        self.ship_date = []
+        for d in ship_date.split(MULTI_VALUE_SPLIT):
+            d = parse_optional(d)
+            if d:
+                parsed_date = parse_amazon_date(d)
+                self.ship_date.append(parsed_date)
+        self.shipping_option = shipping_option
+        self.shipping_address = shipping_address
+        self.billing_address = billing_address
+        self.carrier_name_and_tracking_number = carrier_name_and_tracking_number.split(
+            MULTI_VALUE_SPLIT
+        )
+        self.product_name = product_name
+        self.gift_message = parse_optional(gift_message)
+        self.gift_sender_name = parse_optional(gift_sender_name)
+        self.gift_recipient_contact_details = parse_optional(
+            gift_recipient_contact_details
+        )
 
     @classmethod
     def parse_from_csv(cls, csv_file, progress_factory=no_progress_factory):
@@ -541,10 +610,10 @@ class Item:
         return sum([i.total() for i in items])
 
     def subtotal(self):
-        return self.quantity * self.unit_price
+        return self.unit_price * self.quantity
 
     def subtotal_tax(self):
-        return self.quantity * self.unit_price_tax
+        return self.unit_price_tax * self.quantity
 
     def total(self):
         """Prior to shipping_charge and total_discounts."""
@@ -579,13 +648,15 @@ class Item:
 
     # 9990000 + 1010000
 
-    def tax_rate(self):
-        return round(self.unit_price_tax * 100.0 / self.unit_price, 1)
+    def tax_rate(self) -> float:
+        return round(
+            self.unit_price_tax.to_float() * 100.0 / self.unit_price.to_float(), 1
+        )
 
-    def get_title(self, target_length=100):
+    def get_title(self, target_length=100) -> str:
         return get_title(self, target_length)
 
-    def is_cancelled(self):
+    def is_cancelled(self) -> bool:
         return self.order_status == "Cancelled"
 
     def __repr__(self):
@@ -596,12 +667,12 @@ class Item:
             f"Ship Status {self.shipment_status}\t"
             f"Order Date {self.order_date}\t"
             f"Ship Date {self.ship_date}\t"
-            f"Tracking {self.tracking}\t"
-            f"Unit Price {micro_usd_to_usd_string(self.unit_price)}\t"
-            f"Unit Tax {micro_usd_to_usd_string(self.unit_price_tax)}\t"
-            f"Total Owed {micro_usd_to_usd_string(self.total_owed)}\t"
-            f"Shipping Charge {micro_usd_to_usd_string(self.shipping_charge)}\t"
-            f"Discounts {micro_usd_to_usd_string(self.total_discounts)}\t"
+            f"Tracking {self.carrier_name_and_tracking_number}\t"
+            f"Unit Price {str(self.unit_price)}\t"
+            f"Unit Tax {str(self.unit_price_tax)}\t"
+            f"Total Owed {str(self.total_owed)}\t"
+            f"Shipping Charge {str(self.shipping_charge)}\t"
+            f"Discounts {str(self.total_discounts)}\t"
             f"{self.product_name}"
         )
 

@@ -16,7 +16,13 @@
             "type": "python",
             "request": "launch",
             "module": "monarchmoneyamazontagger.cli",
-            "justMyCode": true
+            "justMyCode": true,
+            "args": [
+                "--amazon_export=/Users/jeff/Downloads/Your Orders.zip",
+                "--dry_run",
+                "--mm_email=a",
+                "--mm_password=a"
+            ]
         }
     ]
 }

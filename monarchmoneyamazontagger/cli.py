@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# This script fetches Amazon "Order History Reports" and annotates your Mint
+# This script fetches Amazon "Order History Reports" and annotates your Monarch Money
 # transactions based on actual items in each purchase. It can handle charges
 # that are split into multiple shipments/charges, and can even itemized each
 # transaction for maximal control over categorization.
@@ -17,7 +17,7 @@ import time
 from outdated import check_outdated
 
 from monarchmoneyamazontagger import amazon
-from monarchmoneyamazontagger import mint
+from monarchmoneyamazontagger import mm
 from monarchmoneyamazontagger import tagger
 from monarchmoneyamazontagger import VERSION
 from monarchmoneyamazontagger.args import define_cli_args, TAGGER_BASE_PATH
@@ -26,9 +26,7 @@ from monarchmoneyamazontagger.my_progress import (
     determinate_progress_cli,
     indeterminate_progress_cli,
 )
-from monarchmoneyamazontagger.currency import micro_usd_to_usd_string
-from monarchmoneyamazontagger.mmclient import MintClient
-from monarchmoneyamazontagger.webdriver import get_webdriver
+from monarchmoneyamazontagger.mmclient import MonarchMoneyClient
 
 logger = logging.getLogger(__name__)
 
@@ -56,66 +54,45 @@ def main():
     root_logger.addHandler(file_handler)
 
     logger.info(f"Running version {VERSION}")
-    try:
-        is_outdated, latest_version = check_outdated("mint-amazon-tagger", VERSION)
-        if is_outdated:
-            logger.warning(
-                "Please update your version by running:\n"
-                "pip3 install mint-amazon-tagger --upgrade\n\n"
-            )
-    except ValueError:
-        logger.error(f"Version {VERSION} is newer than PyPY version")
+    # try:
+    #     is_outdated, latest_version = check_outdated(
+    #         "monarchmoney-amazon-tagger", VERSION
+    #     )
+    #     if is_outdated:
+    #         logger.warning(
+    #             "Please update your version by running:\n"
+    #             "pip3 install monarchmoney-amazon-tagger --upgrade\n\n"
+    #         )
+    # except ValueError:
+    #     logger.error(f"Version {VERSION} is newer than PyPY version")
 
     parser = argparse.ArgumentParser(
-        description="Tag Mint transactions based on itemized Amazon history."
+        description="Tag Monarch Money transactions based on itemized Amazon history."
     )
     define_cli_args(parser)
     args = parser.parse_args()
 
     if args.version:
-        print(f"mint-amazon-tagger {VERSION}\nBy: Jeff Prouty")
+        print(f"monarchmoney-amazon-tagger {VERSION}\nBy: Jeff Prouty")
         exit(0)
 
-    webdriver = None
-
-    def close_webdriver():
-        if webdriver:
-            webdriver.close()
-
-    atexit.register(close_webdriver)
-
-    def webdriver_factory():
-        nonlocal webdriver
-        if webdriver:
-            return webdriver
-        webdriver = get_webdriver(args.headless, args.session_path)
-        return webdriver
-
-    def sigint_handler(signal, frame):
-        if webdriver:
-            webdriver.close()
-        logger.warning("Keyboard interrupt caught")
-        exit(0)
-
-    signal(SIGINT, sigint_handler)
-
-    mint_client = MintClient(args, webdriver_factory)
+    mmc = MonarchMoneyClient(args)
 
     if not args.amazon_export:
         logger.critical("One or more Amazon Export Zip files required.")
         exit(1)
 
     if args.dry_run:
-        logger.info("\nDry Run; no modifications being sent to Mint.\n")
+        logger.info("\nDry Run; no modifications being sent to Monarch Money.\n")
 
     def on_critical(msg):
         logger.critical(msg)
         exit(1)
 
-    maybe_prompt_for_mint_credentials(args)
+    maybe_prompt_for_credentials(args)
     results = tagger.create_updates(
         args,
-        mint_client,
+        mmc,
         on_critical=on_critical,
         indeterminate_progress_factory=indeterminate_progress_cli,
         determinate_progress_factory=determinate_progress_cli,
@@ -130,7 +107,9 @@ def main():
     log_processing_stats(results.stats)
 
     if args.print_unmatched and results.unmatched_charges:
-        logger.warning("The following were not matched to Mint transactions:\n")
+        logger.warning(
+            "The following were not matched to Monarch Money transactions:\n"
+        )
         by_oid = defaultdict(list)
         for uo in results.unmatched_charges:
             by_oid[uo.order_id()].append(uo)
@@ -152,41 +131,22 @@ def main():
                 results.updates, ignore_category=args.no_tag_categories
             )
     else:
-        num_updates = mint_client.send_updates(
+        num_updates = mmc.send_updates(
             results.updates,
             progress=determinate_progress_cli(
-                "Updating Mint", max=len(results.updates)
+                "Updating Monarch Money", max=len(results.updates)
             ),
             ignore_category=args.no_tag_categories,
         )
 
-        logger.info(f"Sent {num_updates} updates to Mint")
+        logger.info(f"Sent {num_updates} updates to Monarch Money")
 
 
-def maybe_prompt_for_mint_credentials(args):
-    if not args.mint_email and not args.mint_user_will_login and not args.pickled_epoch:
-        args.mint_email = input("Mint email: ")
-    if (
-        not args.mint_password
-        and not args.mint_user_will_login
-        and not args.pickled_epoch
-    ):
-        args.mint_password = getpass.getpass("Mint password: ")
-
-
-def maybe_prompt_for_amazon_credentials(args):
-    if not args.amazon_email and not args.amazon_user_will_login:
-        args.amazon_email = input("Amazon email: ")
-    if not args.amazon_email and not args.amazon_user_will_login:
-        logger.error("Empty Amazon email.")
-        return False
-
-    if not args.amazon_password and not args.amazon_user_will_login:
-        args.amazon_password = getpass.getpass("Amazon password: ")
-    if not args.amazon_password and not args.amazon_user_will_login:
-        logger.error("Empty Amazon password.")
-        return False
-    return True
+def maybe_prompt_for_credentials(args):
+    if not args.mm_email and not args.use_json_backup:
+        args.mm_email = input("Money Monarch email: ")
+    if not args.mm_password and not args.use_json_backup:
+        args.mm_password = getpass.getpass("Money Monarch password: ")
 
 
 def log_amazon_stats(items, charges):
@@ -206,17 +166,17 @@ def log_amazon_stats(items, charges):
     per_item_totals = [i.total() for i in items]
     per_order_totals = [c.total_owed() for c in charges]
 
-    logger.info(f"{micro_usd_to_usd_string(sum(per_order_totals))} total spend")
+    logger.info(f"{str(sum(per_order_totals))} total spend")
 
     logger.info(
-        f"{micro_usd_to_usd_string(sum(per_order_totals) / len(oid))} avg "
-        f"order total (range: {micro_usd_to_usd_string(min(per_order_totals))}"
-        f" - {micro_usd_to_usd_string(max(per_order_totals))})"
+        f"{str(sum(per_order_totals) / len(oid))} avg "
+        f"order total (range: {str(min(per_order_totals))}"
+        f" - {str(max(per_order_totals))})"
     )
     logger.info(
-        f"{micro_usd_to_usd_string(sum(per_item_totals) / len(items))} avg "
-        f"item price (range: {micro_usd_to_usd_string(min(per_item_totals))}"
-        f" - {micro_usd_to_usd_string(max(per_item_totals))})"
+        f"{str(sum(per_item_totals) / len(items))} avg "
+        f"item price (range: {str(min(per_item_totals))}"
+        f" - {str(max(per_item_totals))})"
     )
 
     # if refunds:
@@ -231,7 +191,7 @@ def log_amazon_stats(items, charges):
     #     per_refund_totals = [r.total_refund_amount for r in refunds]
 
     #     logger.info(
-    #         f'{micro_usd_to_usd_string(sum(per_refund_totals))} '
+    #         f'{str(sum(per_refund_totals))} '
     #         'total refunded')
 
 
@@ -240,7 +200,7 @@ def log_processing_stats(stats):
     # '{refund_unmatch})\n'
 
     logger.info(
-        "\n{trans} Mint transactions from {earliest_transaction_date} to {latest_transaction_date}\n"
+        "\n{trans} Monarch Money transactions from {earliest_transaction_date} to {latest_transaction_date}\n"
         'Transactions w/ "Amazon" in description: {amazon_in_desc}\n'
         "Transactions ignored: is pending: {pending}\n"
         "\n"
@@ -269,14 +229,14 @@ def log_processing_stats(stats):
 
 
 def print_unmatched(amzn_obj):
-    proposed_mint_desc = mint.summarize_title(
+    proposed_desc = mm.summarize_title(
         [i.get_title() for i in amzn_obj.items], f"{amzn_obj.website()}: "
     )
-    logger.warning(proposed_mint_desc)
+    logger.warning(proposed_desc)
     logger.warning(
         "\t{}\t{}\t{}".format(
             amzn_obj.transact_date() if amzn_obj.transact_date() else "Never shipped!",
-            micro_usd_to_usd_string(amzn_obj.transact_amount()),
+            str(amzn_obj.transact_amount()),
             amazon.get_invoice_url(amzn_obj.order_id()),
         )
     )

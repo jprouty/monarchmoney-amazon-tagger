@@ -1,11 +1,9 @@
-import asyncio
+import datetime
+import json
 import logging
 import os
-from pprint import pprint
-import requests
 import time
-
-from monarchmoneyamazontagger.currency import micro_usd_to_float_usd
+import typing
 
 from monarchmoney import MonarchMoney
 
@@ -27,7 +25,7 @@ class MonarchMoneyClient:
     def is_logged_in(self):
         return self.mm is not None
 
-    def login(self):
+    async def login(self):
         if self.is_logged_in():
             return True
         if not self.hasValidCredentialsForLogin():
@@ -35,216 +33,184 @@ class MonarchMoneyClient:
             return False
 
         self.mm = MonarchMoney()
-        asyncio.run(self.mm.login(self.args.mm_email, self.args.mm_password))
+        await self.mm.login(self.args.mm_email, self.args.mm_password)
+        if self.args.mm_wait_for_sync:
+            await self.mm.request_accounts_refresh_and_wait(
+                account_ids=self.args.mm_account_ids
+            )
+
         return True
 
-    def get_transactions(self, from_date=None, to_date=None):
-        if not self.login():
+    async def get_transactions(
+        self,
+        from_date: typing.Optional[datetime.date] = None,
+        to_date: typing.Optional[datetime.date] = None,
+    ):
+        if self.args.use_json_backup:
+            json_path = _json_transactions_path(
+                self.args.mm_json_backup_path, self.args.use_json_backup
+            )
+            if not os.path.exists(json_path):
+                raise Exception(f"JSON backup file not found: {json_path}")
+            logger.info(f"Loading Transactions from json file: {json_path}")
+            with open(json_path, "r") as json_in:
+                results = json.load(json_in)
+                return results
+
+        if not await self.login():
             logger.error("Cannot login")
             return []
-        logger.info(f"Getting all Mint transactions since {from_date} to {to_date}.")
+        logger.info(
+            f"Getting all Monarch Money transactions since {from_date} to {to_date}."
+        )
 
-        limit = 10000
-        params = {
-            "limit": limit,
-            "fromDate": from_date,
-            "toDate": to_date,
-        }
-        response = self.webdriver.request(
-            "GET", MINT_TRANSACTIONS, headers=self.get_api_header(), params=params
+        limit = 100
+        offset = 0
+        start_date = None
+        if from_date:
+            start_date = from_date.strftime("%Y-%m-%d")
+        end_date = None
+        if to_date:
+            end_date = to_date.strftime("%Y-%m-%d")
+
+        response = await self.mm.get_transactions(
+            limit=limit,
+            offset=offset,
+            start_date=start_date,
+            end_date=end_date,
+            account_ids=self.args.mm_account_ids or [],
         )
         results = []
-
         while True:
-            if not _is_json_response_success("transactions", response):
+            if (
+                not response
+                or response["allTransactions"]["totalCount"] == 0
+                or not response["allTransactions"]["results"]
+            ):
                 return results
-            response_json = response.json()
-            if not response_json["metaData"]["totalSize"]:
-                logger.warning("No transactions found")
-                return results
-            if self.args.mint_save_json:
-                json_path = os.path.join(
-                    self.args.mint_json_location,
-                    f"Mint {int(time.time())} Transactions.json",
-                )
-                logger.info(f"Saving Mint Transactions to json file: {json_path}")
-                with open(json_path, "w") as json_out:
-                    pprint(response_json, json_out)
-            # Remove all transactions that do not have a fiData message. These are
-            # user entered expenses and do not have a fiData entry.
-            results.extend(
-                [trans for trans in response_json["Transaction"] if "fiData" in trans]
+            num_transactions = len(response["allTransactions"]["results"])
+            total_count = len(response["allTransactions"]["totalCount"])
+            logger.info(f"Received {num_transactions} transactions.")
+            logger.info(f"Total of {total_count} transactions.")
+            results.extend(response["allTransactions"]["results"])
+            offset += num_transactions
+            if offset == total_count:
+                break
+            response = await self.mm.get_transactions(
+                limit=limit,
+                offset=offset,
+                start_date=start_date,
+                end_date=end_date,
+                account_ids=self.args.mm_account_ids or [],
             )
 
-            page_size = response_json["metaData"]["pageSize"]
-            total_records = response_json["metaData"]["totalSize"]
+        if self.args.save_json_backup:
+            json_path = _json_transactions_path(
+                self.args.mm_json_backup_path, int(time.time())
+            )
+            logger.info(f"Saving Transactions to json file: {json_path}")
+            with open(json_path, "w") as json_out:
+                json.dump(results, json_out)
 
-            next_page = _get_next_link_href(response_json["metaData"]["link"])
-            if not next_page:
-                # No more transactions.
+        return results
+
+    async def get_categories(self):
+        if self.args.use_json_backup:
+            json_path = _json_categories_path(
+                self.args.mm_json_backup_path, self.args.use_json_backup
+            )
+            if not os.path.exists(json_path):
+                raise Exception(f"JSON backup file not found: {json_path}")
+            logger.info(f"Loading Categories from json file: {json_path}")
+            with open(json_path, "r") as json_in:
+                results = json.load(json_in)
                 return results
-            else:
-                next_page_url = f"{MINT_API_ENDPOINT}/{next_page}"
-                response = self.webdriver.request(
-                    "GET", next_page_url, headers=self.get_api_header()
-                )
-
-    def get_categories(self):
-        if not self.login():
+        if not await self.login():
             logger.error("Cannot login")
             return []
-        logger.info("Getting Mint categories.")
+        logger.info("Getting Monarch Money categories.")
 
-        response = self.webdriver.request(
-            "GET", MINT_CATEGORIES, headers=self.get_api_header()
-        )
-        if not _is_json_response_success("categories", response):
-            return []
-        response_json = response.json()
-        if not response_json["metaData"]["totalSize"]:
-            logger.error("No categories found")
-            return []
-        if self.args.mint_save_json:
-            json_path = os.path.join(
-                self.args.mint_json_location, f"Mint {int(time.time())} Categories.json"
+        results = []
+
+        if self.args.save_json_backup:
+            json_path = _json_categories_path(
+                self.args.mm_json_backup_path, int(time.time())
             )
-            logger.info(f"Saving Mint Categories to json file: {json_path}")
+            logger.info(f"Saving Categories to json file: {json_path}")
             with open(json_path, "w") as json_out:
-                pprint(response_json, json_out)
-        result = {}
-        for cat in response_json["Category"]:
-            result[cat["name"]] = cat
-        return result
+                json.dump(results, json_out)
 
-    def send_updates(self, updates, progress, ignore_category=False):
+        return results
+
+    def send_updates(self, updates, progress, ignore_category: bool = False):
         if not self.login():
             logger.error("Cannot login")
             return 0
         num_requests = 0
-        for orig_trans, new_trans in updates:
-            if len(new_trans) == 1:
-                # Update the existing transaction.
-                trans = new_trans[0]
-                modify_trans = {
-                    "type": trans.type,
-                    "description": trans.description,
-                    "notes": trans.notes,
-                }
-                if not ignore_category:
-                    modify_trans = {
-                        **modify_trans,
-                        "category": {"id": trans.category.id},
-                    }
-
-                logger.debug(f'Sending a "modify" transaction request: {modify_trans}')
-                response = self.webdriver.request(
-                    "PUT",
-                    f"{MINT_TRANSACTIONS}/{trans.id}",
-                    json=modify_trans,
-                    headers=self.get_api_header(),
-                )
-                logger.debug(f"Received response: {response.__dict__}")
-                progress.next()
-                num_requests += 1
-            else:
-                # Split the existing transaction into many.
-                split_children = []
-                for trans in new_trans:
-                    category = (
-                        orig_trans.category if ignore_category else trans.category
-                    )
-                    itemized_split = {
-                        "amount": f"{micro_usd_to_float_usd(trans.amount)}",
-                        "description": trans.description,
-                        "category": {"id": category.id, "name": category.name},
-                        "notes": trans.notes,
-                    }
-                    split_children.append(itemized_split)
-
-                split_edit = {
-                    "type": orig_trans.type,
-                    "amount": micro_usd_to_float_usd(orig_trans.amount),
-                    "splitData": {"children": split_children},
-                }
-                logger.debug(f'Sending a "split" transaction request: {split_edit}')
-                response = self.webdriver.request(
-                    "PUT",
-                    f"{MINT_TRANSACTIONS}/{trans.id}",
-                    json=split_edit,
-                    headers=self.get_api_header(),
-                )
-                logger.debug(f"Received response: {response.__dict__}")
-                progress.next()
-                num_requests += 1
-
-        progress.finish()
         return num_requests
+        # for orig_trans, new_trans in updates:
+        #     if len(new_trans) == 1:
+        #         # Update the existing transaction.
+        #         trans = new_trans[0]
+        #         modify_trans = {
+        #             "type": trans.type,
+        #             "description": trans.description,
+        #             "notes": trans.notes,
+        #         }
+        #         if not ignore_category:
+        #             modify_trans = {
+        #                 **modify_trans,
+        #                 "category": {"id": trans.category.id},
+        #             }
+
+        #         logger.debug(f'Sending a "modify" transaction request: {modify_trans}')
+        #         response = self.webdriver.request(
+        #             "PUT",
+        #             f"{MINT_TRANSACTIONS}/{trans.id}",
+        #             json=modify_trans,
+        #             headers=self.get_api_header(),
+        #         )
+        #         logger.debug(f"Received response: {response.__dict__}")
+        #         progress.next()
+        #         num_requests += 1
+        #     else:
+        #         # Split the existing transaction into many.
+        #         split_children = []
+        #         for trans in new_trans:
+        #             category = (
+        #                 orig_trans.category if ignore_category else trans.category
+        #             )
+        #             itemized_split = {
+        #                 "amount": f"{micro_usd_to_float_usd(trans.amount)}",
+        #                 "description": trans.description,
+        #                 "category": {"id": category.id, "name": category.name},
+        #                 "notes": trans.notes,
+        #             }
+        #             split_children.append(itemized_split)
+
+        #         split_edit = {
+        #             "type": orig_trans.type,
+        #             "amount": micro_usd_to_float_usd(orig_trans.amount),
+        #             "splitData": {"children": split_children},
+        #         }
+        #         logger.debug(f'Sending a "split" transaction request: {split_edit}')
+        #         response = self.webdriver.request(
+        #             "PUT",
+        #             f"{MINT_TRANSACTIONS}/{trans.id}",
+        #             json=split_edit,
+        #             headers=self.get_api_header(),
+        #         )
+        #         logger.debug(f"Received response: {response.__dict__}")
+        #         progress.next()
+        #         num_requests += 1
+
+        # progress.finish()
+        # return num_requests
 
 
-def _get_next_link_href(links):
-    for l in links:
-        if l["rel"] == "next":
-            return l["href"]
-    return None
+def _json_transactions_path(prefix: str, time_epoch: int):
+    return os.path.join(prefix, f"{time_epoch} Transactions.json")
 
 
-def _is_json_response_success(request_string, response):
-    if response.status_code != requests.codes.ok:
-        logger.error(
-            f"Error getting {request_string}. " f"status_code = {response.status_code}"
-        )
-        return False
-    content_type = response.headers.get("content-type", "")
-    if not content_type.startswith("application/json"):
-        logger.error(f"Error getting {request_string}. content_type = {content_type}")
-        return False
-    return True
-
-
-def _get_api_header(webdriver):
-    api_key = webdriver.execute_script(
-        "return window.__shellInternal.appExperience.appApiKey"
-    )
-    auth = f"Intuit_APIKey intuit_apikey={api_key}, intuit_apikey_version=1.0"
-    return {
-        "authorization": auth,
-        "accept": "application/json",
-    }
-
-
-def _await_user_login(webdriver, timeout):
-    try:
-        WebDriverWait(webdriver, timeout).until(EC.url_contains(MINT_OVERVIEW))
-        return True
-    except TimeoutException:
-        logger.info(
-            f"Mint Login Flow: User login did not complete within {timeout} "
-            "seconds. Tool is looking for the account overview page before "
-            "proceeding."
-        )
-        return False
-
-
-def _wait_for_overview_loaded(
-    webdriver, wait_for_sync=False, wait_for_sync_timeout=5 * 60
-):
-    logger.info("Waiting for Mint Overview")
-    try:
-        # Wait for the accounts list to present before continuing.
-        WebDriverWait(webdriver, 30).until(
-            EC.visibility_of_element_located((By.XPATH, '//span[text()="Accounts"]'))
-        )
-        logger.info("Mint overview loaded")
-        if wait_for_sync:
-            logger.info("Waiting for Mint to sync accounts")
-            WebDriverWait(webdriver, wait_for_sync_timeout).until(
-                EC.visibility_of_element_located(
-                    (By.XPATH, '//strong[text()="Account refresh complete."]')
-                )
-            )
-            logger.info("Mint account sync complete")
-    except (TimeoutException, StaleElementReferenceException):
-        logger.warning(
-            "Mint sync apparently incomplete after timeout. "
-            "Data retrieved may not be current."
-        )
+def _json_categories_path(prefix: str, time_epoch: int):
+    return os.path.join(prefix, f"{time_epoch} Categories.json")

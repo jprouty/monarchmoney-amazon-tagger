@@ -7,4 +7,4 @@ gql
 oathtool
 outdated
 progress
-range-key-dict
+readchar

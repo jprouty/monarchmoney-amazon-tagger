@@ -154,6 +154,22 @@ def define_common_args(parser):
         ),
     )
     parser.add_argument(
+        "--mm_wait_for_sync",
+        action="store_true",
+        help=("Wait for Monarch Money to sync accounts immediately after login."),
+    )
+    parser.add_argument(
+        "--mm_account_ids",
+        type=list,
+        default=None,
+        help=(
+            "Only consider tagging transactions for the given Monarch Money accounts, "
+            "provided by ID. To find the appropriate account ID, navigate to the "
+            "account details page on the Monarch Money website and inspect the URL. "
+            "Look for: https://app.monarchmoney.com/accounts/details/ACCOUNT_ID_NUMBER"
+        ),
+    )
+    parser.add_argument(
         "--mm_input_description_filter",
         type=str,
         default="amazon,amzn",
