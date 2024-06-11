@@ -1,6 +1,6 @@
 # Monarch Monery Transactions Tagger for Amazon Purchases
 
-## UPDATE - Recently Migrated from Mint ##
+## UPDATE - This tool is IN PROGRESS, migrating from Mint over to Monarch Money. Please wait for this message to disappear before attempting to use it. ##
 
 ## Overview ##
 
